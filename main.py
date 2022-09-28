@@ -28,7 +28,6 @@ pingspacer = 5
 attempts = 0
 innerattempts = 0
 loopcounter = 0
-timeoutspacer = 20
 workingmanifest = []
 manifest = []
 
@@ -195,20 +194,19 @@ def ProgLoop():
         os.remove(pidfile)
 
 def RigorousTesting():
-    global pingspacer, attempts, innerattempts, timeoutspacer
+    global pingspacer, attempts, innerattempts
     LogFunc("Launching rigorous testing", 'info')
     LogFunc("Testing has been called {} times".format(attempts), 'info')
     LogFunc("Attempt number {}...".format(innerattempts), 'info')
     attempts = attempts +1
-    if PingTest(blackvueHost, timeoutspacer, '5') == True:
+    if PingTest(blackvueHost, '100', '5') == True:
         LogFunc("...alive again - never mind!", 'info')
         ProgLoop()
     else:
         LogFunc("Initial test failed - launching loop test with back-off", 'error')
-        timeoutspacer = timeoutspacer * 2
         LogFunc("Sleeping for {} seconds before next test...".format(pingspacer), 'info')
         time.sleep(pingspacer)
-        pingspacer = pingspacer + 5
+        pingspacer = pingspacer * 2
         innerattempts = innerattempts + 1
         ProgLoop()
 
