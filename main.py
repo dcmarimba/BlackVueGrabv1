@@ -119,6 +119,7 @@ def GetFilesFromBlackVue():
         curfile = os.path.basename(file)
         LogFunc("Loop start for {}".format(curfile), 'info')
         LogFunc("Calling Directory Checker for {}".format(curfile), 'info')
+        CreatePathFolder(recordingFolder, curfile)
         curfilepath = CreateFilePath(recordingFolder, curfile)
         if not os.path.isfile(curfilepath):
             currenturl = blackvueBase + file
@@ -221,6 +222,7 @@ def PidCheck():
             out.write(str(pid))
         LogFunc("Writing PID {} to file".format(pid), 'info')
         return False
+
 def MainLoop():
     LogFunc("MainLoop Start", 'info')
     GetManifest()
