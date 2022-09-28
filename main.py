@@ -28,7 +28,7 @@ pingspacer = 5
 attempts = 0
 innerattempts = 0
 loopcounter = 0
-timeoutspacer = 500
+timeoutspacer = 20
 workingmanifest = []
 manifest = []
 
@@ -205,7 +205,7 @@ def RigorousTesting():
         ProgLoop()
     elif PingTest(blackvueHost, '500', '5') == False:
         LogFunc("Initial test failed - launching loop test with back-off", 'error')
-        timeoutspacer = timeoutspacer + 100
+        timeoutspacer = timeoutspacer * 2
         LogFunc("Sleeping for {} seconds before next test...".format(pingspacer), 'info')
         time.sleep(pingspacer)
         pingspacer = pingspacer + 5
