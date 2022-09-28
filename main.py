@@ -203,7 +203,7 @@ def RigorousTesting():
     if PingTest(blackvueHost, timeoutspacer, '5') == True:
         LogFunc("...alive again - never mind!", 'info')
         ProgLoop()
-    elif PingTest(blackvueHost, '500', '5') == False:
+    else:
         LogFunc("Initial test failed - launching loop test with back-off", 'error')
         timeoutspacer = timeoutspacer * 2
         LogFunc("Sleeping for {} seconds before next test...".format(pingspacer), 'info')
