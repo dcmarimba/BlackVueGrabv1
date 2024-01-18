@@ -1,3 +1,10 @@
+190123 - DPC - V2.1
+
+- Added support for a config.ini file
+- Added enabled/disabled flag that cuts script out entirely if marked as disabled"
+- Fixed some var issues when grabbing manifest
+- Added trimmed list of files based on important file types, config variable to switch between behaviours.
+
 280922 - DPC - v2.0
 
 - Added testing functionality for liveliness.. 

@@ -1,28 +1,24 @@
 # This is my simple script to grab the manifest from a BlackVue dash cam and then grab the files.
-# DPC 220922
-# DPC 280922 - Added looped checking for liveliness, improved manifest to create summary list
 
 # Imports
-import os
-import shutil
-import urllib3
-import logging
-import platform
-import subprocess
-import time
+import os, shutil, urllib3, logging, platform, subprocess, time, json, configparser
 from datetime import datetime
 from urllib3.util import Retry
 from urllib3.util import Timeout
 from urllib3.exceptions import MaxRetryError
 
-# vars
+# Config read, import and dec vars
+config = configparser.ConfigParser()
+config.read('config.ini')
+blackvueHost = config['general']['blackvueHost']
+recordingFolder = config['general']['recordingFolder']
+pidfile = config['general']['pidfile']
+logfile = config['general']['logfile']
+enabled = bool(config['general']['enabled'])
 
-blackvueHost = '10.100.0.121'
+# vars
 blackvueBase = 'http://' + blackvueHost + '/'
 blackvueVOD = 'blackvue_vod.cgi'
-recordingFolder = 'Recordings'
-pidfile = 'pidfile.pid'
-logfile = 'blackvuegrab.log'
 pid = os.getpid()
 pingspacer = 5
 attempts = 0
@@ -30,8 +26,6 @@ innerattempts = 0
 loopcounter = 0
 workingmanifest = []
 manifest = []
-
-# var expansion
 
 def CreatePath(basefolder, file):
     CreatePathStep1 = os.path.join(basefolder, file)
@@ -65,7 +59,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%m/
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', filename=logfile, level=logging.ERROR)
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', filename=logfile, level=logging.WARNING)
 
-# We need to store the manifest of the files, as the server is slow and unrelliable
+# We need to store the manifest of the files, as the server is slow and unreliable
 
 def PingTest(host, timeout, count):
     param1 = '-n' if platform.system().lower() == 'windows' else '-c'
@@ -90,23 +84,43 @@ def GetManifest():
 
 def ManifestToNiceListv2():
     global manifest
-    step4 = []
-    LogFunc("working on the manifest..", 'info')
-    step1 = list(workingmanifest.split(","))
-    step2 = [elem.replace('v:1.00\r\nn:', '') for elem in step1]
-    step3 = [elem.replace('s:1000000\r\nn:', '') for elem in step2]
-    step3.pop()
-    LogFunc("The base manifest has {} items in it".format(len(step3)), 'info')
-    for file in step3:
-        curfile = os.path.basename(file)
-        curfilepath = CreateFilePath(recordingFolder, curfile)
-        if not os.path.isfile(curfilepath):
-            step4.append(file)
-        else:
-            pass
-    LogFunc("Manifest tidy up complete", 'info')
-    LogFunc("The trimmed manifest has {} items to work on".format(len(step4)), 'info')
-    manifest = step4
+    step5 = []
+    if len(workingmanifest) == 0:
+        LogFunc('Empty Manifest - Some HTTP Error?, exiting.', 'error')
+        exit()
+    elif len(workingmanifest) != 0:
+        FileTypes = ['EF', 'ER', 'IF', 'IR', 'NF', 'NR', 'OF', 'OR', 'AF', 'AR', 'TF', 'TR', 'BF', 'BR']
+        LogFunc("working on the manifest..", 'info')
+        step1 = workingmanifest.split(",")
+        step2 = [elem.replace('v:1.00\r\nn:', '') for elem in step1]
+        step3 = [elem.replace('s:1000000\r\nn:', '') for elem in step2]
+        step4 = [elem.replace('s:1000000', '') for elem in step3]
+        step4.pop()
+        LogFunc("The base manifest has {} items in it".format(len(step4)), 'info')
+        if config['enabledFileTypes']['allFileTypes'] == 'True':
+            LogFunc("Using all file types due to config option", 'info')
+            for file in step4:
+                curfile = os.path.basename(file)
+                curfilepath = CreateFilePath(recordingFolder, curfile)
+                if not os.path.isfile(curfilepath):
+                    step5.append(file)
+                else:
+                    pass
+        elif config['enabledFileTypes']['allFileTypes'] == 'False':
+            LogFunc("Using trimmed file types due to config option", 'info')
+            for filetype in FileTypes:
+                filetypeCount = 0
+                for index, file in enumerate(step4):
+                    if filetype in file:
+                        filetypeCount = filetypeCount + 1
+                        step5.append(file)
+                if filetypeCount > 0:
+                    LogFunc("There was {} of filetype {} in the list.".format(str(filetypeCount), filetype), 'info')
+                else:
+                    pass
+        LogFunc("Manifest tidy up complete", 'info')
+        LogFunc("The trimmed manifest has a total of {} items to work on".format(len(step5)), 'info')
+        manifest = step5
 
 def GetFilesFromBlackVue():
     global manifest, loopcounter
@@ -137,6 +151,7 @@ def GetFilesFromBlackVue():
             LogFunc("File {} exists.. not downloading".format(curfilepath), 'info')
         else:
             LogFunc("Failed after {} files".format(loopcounter), 'error')
+    PushOverRequest("Successfully downloaded {} files".format(loopcounter))
     LogFunc("Successfully downloaded {} files".format(loopcounter), 'info')
     LogFunc("I'm finished here! see ya later..", 'info')
 
@@ -175,10 +190,20 @@ def LogFuncBreak(opt):
         LogFunc("*********** INITIAL TEST FAILED **********", 'error')
         LogFunc("", 'error')
 
+def PushOverRequest(message):
+    pushoverbaseurl = 'https://api.pushover.net/1/messages.json'
+    pushovertoken = 'agb75f1snt65npd3a19c76aqjgkn2m'
+    pushoveruser = 'uxk9ryocsy959vuv8jte3xpyygk8wc'
+    cert_reqs = 'CERT_NONE'
+    http = urllib3.PoolManager()
+    jsonbase = json.dumps({"token": pushovertoken, "user": pushoveruser, "message": message,})
+    postrequest = http.request('POST', pushoverbaseurl, headers={'Content-Type': 'application/json'}, body=jsonbase)
+
 def ProgLoop():
     global innerattempts
     if innerattempts == 5:
         LogFunc("Exhausted {} attempts, exiting.".format(innerattempts), 'error')
+        PushOverRequest("Exhausted {} attempts, exiting.".format(innerattempts))
         LogFunc("Deleting PID {}".format(pid), 'info')
         LogFuncBreak('bad')
         os.remove(pidfile)
@@ -188,6 +213,7 @@ def ProgLoop():
     elif PingTest(blackvueHost, '100', '5') == True:
         LogFuncBreak('start')
         LogFunc("Successful host check - continuing", 'info')
+        PushOverRequest("Successful host check - continuing")
         MainLoop()
         LogFunc("Deleting PID {}".format(pid), 'info')
         LogFuncBreak('end')
@@ -222,11 +248,15 @@ def PidCheck():
         return False
 
 def MainLoop():
-    LogFunc("MainLoop Start", 'info')
-    GetManifest()
-    ManifestToNiceListv2()
-    GetFilesFromBlackVue()
-    LogFunc("MainLoop end", 'info')
+    if enabled == 1:
+        LogFunc("Script enabled, continuing", 'info')
+        LogFunc("MainLoop Start", 'info')
+        GetManifest()
+        ManifestToNiceListv2()
+        GetFilesFromBlackVue()
+        LogFunc("MainLoop end", 'info')
+    elif enabled == 0:
+        LogFunc("Exit, script disabled", 'info')
 
 if PidCheck() == False:
     ProgLoop()
