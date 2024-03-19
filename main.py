@@ -202,15 +202,7 @@ def PushOverRequest(message):
     postrequest = http.request('POST', pushoverbaseurl, headers={'Content-Type': 'application/json'}, body=jsonbase)
 
 def ProgLoop():
-    global innerattempts
-    if innerattempts == attemptno:
-        LogFunc("Exhausted {} attempts, exiting.".format(innerattempts), 'error')
-        PushOverRequest("Exhausted {} attempts, exiting.".format(innerattempts))
-        LogFunc("Deleting PID {}".format(pid), 'info')
-        LogFuncBreak('bad')
-        os.remove(pidfile)
-        exit()
-    elif PingTest(blackvueHost, '100', '10') == False:
+    if PingTest(blackvueHost, '100', '10') == False:
         LogFuncBreak('badtest')
         RigorousTesting()
     elif PingTest(blackvueHost, '100', '5') == True:
@@ -224,12 +216,19 @@ def ProgLoop():
         exit()
 
 def RigorousTesting():
-    global pingspacer, attempts, innerattempts
+    global pingspacer, attempts, innerattempts, attemptno
     LogFunc("Launching rigorous testing", 'info')
     LogFunc("Testing has been called {} times".format(attempts), 'info')
     LogFunc("Attempt number {}...".format(innerattempts), 'info')
     attempts = attempts +1
-    if PingTest(blackvueHost, '100', '5') == True:
+    if innerattempts == attemptno:
+        LogFunc("Exhausted {} attempts, exiting.".format(innerattempts), 'error')
+        PushOverRequest("Exhausted {} attempts, exiting.".format(innerattempts))
+        LogFunc("Deleting PID {}".format(pid), 'info')
+        LogFuncBreak('bad')
+        os.remove(pidfile)
+        exit()
+    elif PingTest(blackvueHost, '100', '5') == True:
         LogFunc("...alive again - never mind!", 'info')
         ProgLoop()
     else:
