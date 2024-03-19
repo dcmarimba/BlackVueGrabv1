@@ -1,3 +1,7 @@
+190324 - DPC - V2.2 (Testing)
+
+- Amended to fix endless loop issue causing script to hang forever.
+
 190123 - DPC - V2.1
 
 - Added support for a config.ini file
