@@ -1,4 +1,5 @@
 # This is my simple script to grab the manifest from a BlackVue dash cam and then grab the files.
+# V2.2
 
 # Imports
 import os, shutil, urllib3, logging, platform, subprocess, time, json, configparser
