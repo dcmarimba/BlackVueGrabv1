@@ -15,6 +15,7 @@ recordingFolder = config['general']['recordingFolder']
 pidfile = config['general']['pidfile']
 logfile = config['general']['logfile']
 enabled = bool(config['general']['enabled'])
+attemptno = int(config['general']['attempts'])
 
 # vars
 blackvueBase = 'http://' + blackvueHost + '/'
@@ -84,7 +85,7 @@ def GetManifest():
 
 def ManifestToNiceListv2():
     global manifest
-    step5 = []
+    step6 = []
     if len(workingmanifest) == 0:
         LogFunc('Empty Manifest - Some HTTP Error?, exiting.', 'error')
         exit()
@@ -95,32 +96,33 @@ def ManifestToNiceListv2():
         step2 = [elem.replace('v:1.00\r\nn:', '') for elem in step1]
         step3 = [elem.replace('s:1000000\r\nn:', '') for elem in step2]
         step4 = [elem.replace('s:1000000', '') for elem in step3]
-        step4.pop()
-        LogFunc("The base manifest has {} items in it".format(len(step4)), 'info')
+        step5 = [elem.replace('\r\n', '') for elem in step4]
+        step5.pop()
+        LogFunc("The base manifest has {} items in it".format(len(step5)), 'info')
         if config['enabledFileTypes']['allFileTypes'] == 'True':
             LogFunc("Using all file types due to config option", 'info')
-            for file in step4:
+            for file in step5:
                 curfile = os.path.basename(file)
                 curfilepath = CreateFilePath(recordingFolder, curfile)
                 if not os.path.isfile(curfilepath):
-                    step5.append(file)
+                    step6.append(file)
                 else:
                     pass
         elif config['enabledFileTypes']['allFileTypes'] == 'False':
             LogFunc("Using trimmed file types due to config option", 'info')
             for filetype in FileTypes:
                 filetypeCount = 0
-                for index, file in enumerate(step4):
+                for index, file in enumerate(step5):
                     if filetype in file:
                         filetypeCount = filetypeCount + 1
-                        step5.append(file)
+                        step6.append(file)
                 if filetypeCount > 0:
                     LogFunc("There was {} of filetype {} in the list.".format(str(filetypeCount), filetype), 'info')
                 else:
                     pass
         LogFunc("Manifest tidy up complete", 'info')
-        LogFunc("The trimmed manifest has a total of {} items to work on".format(len(step5)), 'info')
-        manifest = step5
+        LogFunc("The trimmed manifest has a total of {} items to work on".format(len(step6)), 'info')
+        manifest = step6
 
 def GetFilesFromBlackVue():
     global manifest, loopcounter
@@ -201,12 +203,13 @@ def PushOverRequest(message):
 
 def ProgLoop():
     global innerattempts
-    if innerattempts == 5:
+    if innerattempts == attemptno:
         LogFunc("Exhausted {} attempts, exiting.".format(innerattempts), 'error')
         PushOverRequest("Exhausted {} attempts, exiting.".format(innerattempts))
         LogFunc("Deleting PID {}".format(pid), 'info')
         LogFuncBreak('bad')
         os.remove(pidfile)
+        exit()
     elif PingTest(blackvueHost, '100', '10') == False:
         LogFuncBreak('badtest')
         RigorousTesting()
@@ -218,6 +221,7 @@ def ProgLoop():
         LogFunc("Deleting PID {}".format(pid), 'info')
         LogFuncBreak('end')
         os.remove(pidfile)
+        exit()
 
 def RigorousTesting():
     global pingspacer, attempts, innerattempts
@@ -238,12 +242,17 @@ def RigorousTesting():
 
 def PidCheck():
     if os.path.exists(pidfile):
-        LogFunc("a PID file exists! Exiting", 'error')
-        LogFuncBreak('bad')
+        with open(pidfile, 'r') as old:
+            oldpid = old.read()
+            LogString = f"PID file existis with PID {oldpid} Exiting"
+            LogFunc(LogString, 'error')
+            LogFuncBreak('bad')
+            old.close()
         return True
     elif not os.path.exists(pidfile):
         with open(pidfile, 'w') as out:
             out.write(str(pid))
+            out.close()
         LogFunc("Writing PID {} to file".format(pid), 'info')
         return False
 
@@ -255,8 +264,12 @@ def MainLoop():
         ManifestToNiceListv2()
         GetFilesFromBlackVue()
         LogFunc("MainLoop end", 'info')
+        exit()
     elif enabled == 0:
         LogFunc("Exit, script disabled", 'info')
+        exit()
 
 if PidCheck() == False:
     ProgLoop()
+else:
+    exit()
