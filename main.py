@@ -201,20 +201,6 @@ def PushOverRequest(message):
     jsonbase = json.dumps({"token": pushovertoken, "user": pushoveruser, "message": message,})
     postrequest = http.request('POST', pushoverbaseurl, headers={'Content-Type': 'application/json'}, body=jsonbase)
 
-def ProgLoop():
-    if PingTest(blackvueHost, '100', '10') == False:
-        LogFuncBreak('badtest')
-        RigorousTesting()
-    elif PingTest(blackvueHost, '100', '5') == True:
-        LogFuncBreak('start')
-        LogFunc("Successful host check - continuing", 'info')
-        PushOverRequest("Successful host check - continuing")
-        MainLoop()
-        LogFunc("Deleting PID {}".format(pid), 'info')
-        LogFuncBreak('end')
-        os.remove(pidfile)
-        exit()
-
 def RigorousTesting():
     global pingspacer, attempts, innerattempts, attemptno
     LogFunc("Launching rigorous testing", 'info')
@@ -230,14 +216,14 @@ def RigorousTesting():
         exit()
     elif PingTest(blackvueHost, '100', '5') == True:
         LogFunc("...alive again - never mind!", 'info')
-        ProgLoop()
+        MainLoop()
     else:
         LogFunc("Initial test failed - launching loop test with back-off", 'error')
         LogFunc("Sleeping for {} seconds before next test...".format(pingspacer), 'info')
         time.sleep(pingspacer)
         pingspacer = pingspacer * 2
         innerattempts = innerattempts + 1
-        ProgLoop()
+        MainLoop()
 
 def PidCheck():
     if os.path.exists(pidfile):
@@ -259,16 +245,26 @@ def MainLoop():
     if enabled == 1:
         LogFunc("Script enabled, continuing", 'info')
         LogFunc("MainLoop Start", 'info')
-        GetManifest()
-        ManifestToNiceListv2()
-        GetFilesFromBlackVue()
-        LogFunc("MainLoop end", 'info')
-        exit()
+        if PingTest(blackvueHost, '100', '5') == True:
+            LogFuncBreak('start')
+            LogFunc("Successful host check - continuing", 'info')
+            PushOverRequest("Successful host check - continuing")
+            GetManifest()
+            ManifestToNiceListv2()
+            GetFilesFromBlackVue()
+            LogFunc("MainLoop end", 'info')
+            LogFunc("Deleting PID {}".format(pid), 'info')
+            LogFuncBreak('end')
+            os.remove(pidfile)
+            exit()
+        elif PingTest(blackvueHost, '100', '10') == False:
+            LogFuncBreak('badtest')
+            RigorousTesting()
     elif enabled == 0:
         LogFunc("Exit, script disabled", 'info')
         exit()
 
 if PidCheck() == False:
-    ProgLoop()
+    MainLoop()
 else:
     exit()
